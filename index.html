@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>线性代数 · 智能刷题系统</title>
+<style>
+:root{
+  --bg:#f4f6fa; --card:#ffffff; --line:#e3e8f0;
+  --ink:#1d2433; --sub:#5c6b84; --brand:#3b6ef0; --brand-dark:#2d55c4;
+  --ok:#17a06a; --ok-bg:#e6f7ef; --bad:#d64545; --bad-bg:#fdeeee;
+  --yellow:#d9a022; --yellow-bg:#fdf6e3;
+  --radius:14px; --shadow:0 1px 3px rgba(20,40,80,.08), 0 4px 14px rgba(20,40,80,.06);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--ink); line-height:1.65;}
+.hidden{display:none !important;}
+
+/* 顶栏 */
+header{background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10;}
+.header-inner{max-width:860px; margin:0 auto; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+.logo{font-size:17px; font-weight:700; display:flex; align-items:center; gap:8px;}
+.logo .dot{width:10px;height:10px;border-radius:50%;background:var(--brand);display:inline-block;}
+.logo small{font-weight:400;color:var(--sub);font-size:12px;}
+nav{display:flex; gap:4px; flex-wrap:wrap;}
+nav button{border:none;background:none;padding:7px 14px;border-radius:9px;font-size:14px;color:var(--sub);cursor:pointer;transition:.15s;}
+nav button:hover{background:#eef2fa;color:var(--ink);}
+nav button.active{background:var(--brand);color:#fff;}
+
+main{max-width:860px; margin:0 auto; padding:20px;}
+.page{animation:fadein .2s;}
+@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+/* 卡片 */
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px;}
+h3{font-size:15px; margin:22px 0 10px; color:var(--ink);}
+h3:first-child{margin-top:0;}
+
+/* 首页 */
+#home-summary{color:var(--sub); font-size:14px; margin-bottom:14px;}
+.mode-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.mode-card{border:1px solid var(--line); border-radius:var(--radius); padding:16px; cursor:pointer; transition:.15s; background:#fbfcfe;}
+.mode-card:hover{border-color:var(--brand); box-shadow:var(--shadow); transform:translateY(-1px);}
+.mode-card .mc-title{font-weight:700; font-size:15px; margin-bottom:4px;}
+.mode-card .mc-desc{font-size:12.5px; color:var(--sub);}
+.mode-card.hl{border-color:var(--brand); background:#f4f7ff;}
+.settings-row{display:flex; gap:12px; align-items:center; margin-top:16px; flex-wrap:wrap;}
+.settings-row label{font-size:13px; color:var(--sub);}
+select{border:1px solid var(--line); border-radius:9px; padding:7px 10px; font-size:14px; background:#fff; color:var(--ink);}
+.home-tip{margin-top:16px; font-size:12.5px; color:var(--sub); background:#f6f8fc; border:1px dashed var(--line); border-radius:10px; padding:10px 14px;}
+
+/* 题目区 */
+#quiz-title{font-size:14px; color:var(--sub); margin-bottom:10px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;}
+.progress-track{height:6px; background:#e8edf5; border-radius:99px; overflow:hidden; margin-bottom:18px;}
+#quiz-progress{height:100%; background:linear-gradient(90deg,var(--brand),#6f96ff); border-radius:99px; transition:width .3s;}
+#quiz-score{font-size:13px; color:var(--sub); text-align:right; margin-bottom:6px;}
+.q-meta{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+.chip{font-size:12px; background:#eef2fa; color:#4a5d80; border-radius:99px; padding:3px 10px;}
+.chip-topic{background:#e9f0ff; color:var(--brand-dark);}
+.chip-multi{background:var(--yellow-bg); color:#9a7410;}
+.chip-judge{background:#f3ecff; color:#6d4bb5;}
+.chip-blank{background:#e6f9f2; color:#0d7a52;}
+.q-stem{font-size:16px; font-weight:600; margin-bottom:14px;}
+.stem-box{font-size:14.5px; font-weight:400; color:var(--ink); background:#f8fafd; border:1px solid var(--line); border-radius:10px; padding:12px 14px; white-space:pre-wrap;}
+.essay-title{font-size:16.5px;}
+.q-img{text-align:center; margin:10px 0 14px;}
+.q-img img{max-width:100%; border:1px solid var(--line); border-radius:10px;}
+
+/* 选项 */
+.options{display:flex; flex-direction:column; gap:10px;}
+.option{display:flex; align-items:flex-start; gap:12px; text-align:left; border:1.5px solid var(--line); background:#fff; border-radius:12px; padding:12px 14px; font-size:15px; cursor:pointer; transition:.15s; width:100%;}
+.option:hover{border-color:var(--brand); background:#f7faff;}
+.option.selected{border-color:var(--brand); background:#eef3ff;}
+.opt-tag{flex:none; width:26px; height:26px; border-radius:8px; background:#eef2fa; color:#4a5d80; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center;}
+.option.selected .opt-tag{background:var(--brand); color:#fff;}
+
+/* 填空 */
+.blank-wrap{display:flex; flex-direction:column; gap:10px; margin-bottom:14px;}
+.blank-item{display:flex; align-items:center; gap:8px;}
+.blank-input{flex:1; border:1.5px solid var(--line); border-radius:10px; padding:11px 14px; font-size:15px; outline:none; transition:.15s;}
+.blank-input:focus{border-color:var(--brand); box-shadow:0 0 0 3px rgba(59,110,240,.12);}
+
+/* 按钮 */
+.btn{border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:10px; padding:10px 18px; font-size:14.5px; cursor:pointer; transition:.15s;}
+.btn:hover{border-color:var(--brand); color:var(--brand);}
+.btn-primary{background:var(--brand); border-color:var(--brand); color:#fff; font-weight:600;}
+.btn-primary:hover{background:var(--brand-dark); border-color:var(--brand-dark); color:#fff;}
+.btn-block{width:100%; margin-top:14px;}
+.btn-ok{background:var(--ok); border-color:var(--ok); color:#fff;}
+.btn-bad{background:var(--bad); border-color:var(--bad); color:#fff;}
+.btn:disabled{opacity:.5; cursor:not-allowed;}
+
+/* 反馈 */
+#feedback{margin-top:16px;}
+.fb-result{font-size:16px; font-weight:700; padding:10px 14px; border-radius:10px; margin-bottom:12px;}
+.fb-ok{background:var(--ok-bg); color:var(--ok);}
+.fb-bad{background:var(--bad-bg); color:var(--bad);}
+.fb-warn{background:var(--yellow-bg); color:#9a7410; padding:10px 14px; border-radius:10px; font-size:14px;}
+.fb-line{font-size:14px; color:var(--sub); margin-bottom:10px;}
+.fb-options{display:flex; flex-direction:column; gap:8px;}
+.fb-opt{display:flex; gap:12px; border:1.5px solid var(--line); border-radius:12px; padding:10px 14px; font-size:14px; align-items:flex-start;}
+.fb-opt .opt-tag{background:#f1f4f9;}
+.fb-opt.opt-right{border-color:var(--ok); background:var(--ok-bg);}
+.fb-opt.opt-right .opt-tag{background:var(--ok); color:#fff;}
+.fb-opt.opt-wrong{border-color:var(--bad); background:var(--bad-bg);}
+.fb-opt.opt-wrong .opt-tag{background:var(--bad); color:#fff;}
+.fb-opt-text{margin-bottom:2px;}
+.fb-opt-exp{font-size:13px; color:var(--sub);}
+.fb-rest{margin-top:8px; font-size:13px; color:var(--sub); background:#f8fafd; border:1px dashed var(--line); border-radius:10px; padding:8px 12px;}
+.fb-rest summary{cursor:pointer; color:#4a5d80;}
+.fb-note{font-size:13px; color:#8a6d1a; background:var(--yellow-bg); border-radius:10px; padding:8px 12px; margin-top:10px;}
+
+/* 完成页 / 空态 */
+.finish-box{text-align:center; padding:30px 10px;}
+.finish-emoji{font-size:44px; margin-bottom:8px;}
+.finish-title{font-size:19px; font-weight:700; margin-bottom:8px;}
+.finish-line{color:var(--sub); margin-bottom:10px;}
+.finish-tip{font-size:13.5px; color:#8a6d1a; background:var(--yellow-bg); border-radius:10px; padding:10px 14px; margin-bottom:16px; text-align:left;}
+.finish-btns{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:14px;}
+.empty{color:var(--sub); text-align:center; padding:40px 10px; font-size:14.5px;}
+
+/* 自评 */
+.essay-hint{font-size:13px; color:var(--sub); margin-bottom:12px;}
+.essay-ans{margin-top:14px;}
+.essay-ans pre{background:#f8fafd; border:1px solid var(--line); border-radius:10px; padding:14px; font-family:inherit; font-size:14px; white-space:pre-wrap; line-height:1.8;}
+.essay-grade-tip{font-size:13.5px; color:var(--sub); margin-bottom:4px; text-align:center;}
+
+/* 错题本 */
+.wrong-item{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:#fff;}
+.wrong-head{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px;}
+.wrong-cnt{font-size:12px; color:var(--bad); background:var(--bad-bg); border-radius:99px; padding:3px 10px;}
+.wrong-stem{font-size:14px; color:var(--ink);}
+
+/* 统计 */
+.stat-cards{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:8px;}
+.stat-card{background:#f8fafd; border:1px solid var(--line); border-radius:12px; text-align:center; padding:14px; font-size:13px; color:var(--sub);}
+.stat-num{font-size:24px; font-weight:700; color:var(--ink);}
+.stat-list{display:flex; flex-direction:column; gap:8px;}
+.stat-row{display:flex; align-items:center; gap:10px; font-size:13px;}
+.stat-label{flex:0 0 220px; color:var(--ink);}
+.stat-bar-wrap{flex:1; height:8px; background:#e8edf5; border-radius:99px; overflow:hidden;}
+.stat-bar{height:100%; border-radius:99px; transition:width .4s;}
+.bar-green{background:var(--ok);} .bar-yellow{background:var(--yellow);} .bar-red{background:var(--bad);} .bar-empty{background:#d5dce8;}
+.stat-val{flex:0 0 120px; text-align:right; color:var(--sub);}
+.stat-note{font-size:12.5px; color:var(--sub); margin-top:12px;}
+
+footer{max-width:860px; margin:0 auto; padding:10px 20px 34px; font-size:12.5px; color:#8b96ab; text-align:center;}
+
+@media (max-width:640px){
+  .mode-grid{grid-template-columns:1fr;}
+  .stat-label{flex-basis:120px;}
+  .stat-val{flex-basis:90px;}
+  .stat-cards{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div class="logo"><span class="dot"></span>线性代数 · 智能刷题系统<small>错题记忆 · 知识点加权强化</small></div>
+    <nav>
+      <button data-page="home" class="active">开始练习</button>
+      <button data-page="wrong">错题本</button>
+      <button data-page="stats">统计</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- 首页 -->
+  <section id="page-home" class="page">
+    <div class="card">
+      <div id="home-summary"></div>
+      <div class="mode-grid">
+        <div class="mode-card hl" onclick="startQuiz('adaptive')">
+          <div class="mc-title">🧠 智能自适应练习</div>
+          <div class="mc-desc">全部内容随机出题；答错的题权重升高、优先重现，并连带强化同知识点题目</div>
+        </div>
+        <div class="mode-card" onclick="startQuiz('wrong')">
+          <div class="mc-title">📕 错题强化</div>
+          <div class="mc-desc">只刷错题本中的题目，逐题附解析，直到清零</div>
+        </div>
+        <div class="mode-card" onclick="startQuiz('order')">
+          <div class="mc-title">📖 顺序练习</div>
+          <div class="mc-desc">按题库顺序逐题作答，适合第一轮全面过一遍</div>
+        </div>
+        <div class="mode-card" onclick="startEssay()">
+          <div class="mc-title">✍️ 计算与证明题自评</div>
+          <div class="mc-desc">矩阵方程、极大无关组、线性相关性证明等大题：先做后对照参考答案自评</div>
+        </div>
+      </div>
+      <div class="settings-row">
+        <label>部分：</label>
+        <select id="chapter-select"></select>
+        <label>每轮题量：</label>
+        <select id="count-select">
+          <option value="0">全部</option>
+          <option value="10" selected>10 题</option>
+          <option value="20">20 题</option>
+          <option value="30">30 题</option>
+        </select>
+        <button class="btn btn-primary" onclick="startQuiz('chapter')">按部分练习</button>
+      </div>
+      <div class="home-tip">
+        💡 <b>使用说明</b>：答错时立即显示正确答案和每个选项的解析；错题自动记入错题本，并按"错题 + 知识点"双重加权提高后续出现频率。矩阵写法约定：[1 0; 2 3] 表示第 1 行为 1、0，第 2 行为 2、3（分号分隔行）。进度保存在浏览器本地，换设备前请在"统计"页导出备份。手机做题：用手机浏览器打开本页面即可。
+      </div>
+    </div>
+  </section>
+
+  <!-- 答题页 -->
+  <section id="page-quiz" class="page hidden">
+    <div class="card">
+      <div id="quiz-title"></div>
+      <div class="progress-track"><div id="quiz-progress"></div></div>
+      <div id="quiz-score"></div>
+      <div id="quiz-body"></div>
+    </div>
+  </section>
+
+  <!-- 错题本 -->
+  <section id="page-wrong" class="page hidden">
+    <div class="card">
+      <h3>📕 错题本</h3>
+      <div id="wrong-body"></div>
+    </div>
+  </section>
+
+  <!-- 统计 -->
+  <section id="page-stats" class="page hidden">
+    <div class="card">
+      <h3>📊 学习统计</h3>
+      <div id="stats-body"></div>
+    </div>
+  </section>
+</main>
+
+<footer>题库来源：《矩阵与线性代数单选题题库（98 题）》及向量组大题照片 · 解析由 AI 逐题编写 · 数据仅保存在本机浏览器</footer>
+
+<script src="bank.js"></script>
+<script src="essay.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
