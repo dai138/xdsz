@@ -131,6 +131,27 @@ select{border:1px solid var(--line); border-radius:9px; padding:7px 10px; font-s
 .wrong-cnt{font-size:12px; color:var(--bad); background:var(--bad-bg); border-radius:99px; padding:3px 10px;}
 .wrong-stem{font-size:14px; color:var(--ink);}
 
+/* 模拟考试 */
+.exam-bar{position:sticky; top:52px; z-index:9; display:flex; align-items:center; gap:12px; background:#1d2433; color:#fff; border-radius:12px; padding:10px 16px; margin-bottom:14px; box-shadow:var(--shadow);}
+.exam-timer{font-variant-numeric:tabular-nums; font-weight:700; font-size:19px; letter-spacing:1px;}
+.exam-timer.urgent{color:#ff8a80; animation:blink 1s step-start infinite;}
+@keyframes blink{50%{opacity:.4;}}
+.exam-answered{flex:1; font-size:13px; color:#aebcd6;}
+#btn-handin{background:#fff; border-color:#fff; color:#1d2433; font-weight:600;}
+#btn-handin:hover{background:#eef2fa; border-color:#eef2fa; color:#1d2433;}
+.exam-q{border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px; background:#fff;}
+.exam-q-head{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;}
+.exam-q-num{font-weight:700; color:var(--brand); font-size:13px;}
+.exam-stem{font-size:15px; font-weight:600; margin-bottom:10px;}
+.exam-q .options{gap:8px;}
+.exam-q .option{font-size:14px; padding:9px 13px;}
+.chip-ok{background:var(--ok-bg); color:var(--ok);}
+.chip-no{background:var(--bad-bg); color:var(--bad);}
+.chip-miss{background:#eef0f5; color:#5c6b84;}
+.exam-score{font-size:52px; font-weight:800; line-height:1.1; margin-bottom:6px;}
+.exam-score-unit{font-size:16px; font-weight:400; color:var(--sub); margin-left:4px;}
+.exam-score.good{color:var(--ok);} .exam-score.mid{color:var(--yellow);} .exam-score.bad{color:var(--bad);}
+
 /* 统计 */
 .stat-cards{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:8px;}
 .stat-card{background:#f8fafd; border:1px solid var(--line); border-radius:12px; text-align:center; padding:14px; font-size:13px; color:var(--sub);}
@@ -184,6 +205,10 @@ footer{max-width:860px; margin:0 auto; padding:10px 20px 34px; font-size:12.5px;
           <div class="mc-title">📖 顺序练习</div>
           <div class="mc-desc">按题库顺序逐题作答，适合第一轮全面过一遍</div>
         </div>
+        <div class="mode-card" onclick="startExam()">
+          <div class="mc-title">📝 模拟考试</div>
+          <div class="mc-desc">随机抽 20 题 · 限时 30 分钟，到时自动交卷；交卷后逐题复盘，错题自动进错题本</div>
+        </div>
         <div class="mode-card" onclick="startEssay()">
           <div class="mc-title">✍️ 计算与证明题自评</div>
           <div class="mc-desc">矩阵方程、极大无关组、线性相关性证明等大题：先做后对照参考答案自评</div>
@@ -202,7 +227,7 @@ footer{max-width:860px; margin:0 auto; padding:10px 20px 34px; font-size:12.5px;
         <button class="btn btn-primary" onclick="startQuiz('chapter')">按部分练习</button>
       </div>
       <div class="home-tip">
-        💡 <b>使用说明</b>：答错时立即显示正确答案和每个选项的解析；错题自动记入错题本，并按"错题 + 知识点"双重加权提高后续出现频率。矩阵写法约定：[1 0; 2 3] 表示第 1 行为 1、0，第 2 行为 2、3（分号分隔行）。进度保存在浏览器本地，换设备前请在"统计"页导出备份。手机做题：用手机浏览器打开本页面即可。
+        💡 <b>使用说明</b>：答错时立即显示正确答案和每个选项的解析；错题自动记入错题本，并按"错题 + 知识点"双重加权提高后续出现频率。📝 <b>模拟考试</b>：随机抽 20 题、限时 30 分钟倒计时，时间一到自动交卷，交卷后逐题复盘，错题同样进入错题本。矩阵写法约定：[1 0; 2 3] 表示第 1 行为 1、0，第 2 行为 2、3（分号分隔行）。进度保存在浏览器本地，换设备前请在"统计"页导出备份。手机做题：用手机浏览器打开本页面即可。
       </div>
     </div>
   </section>
@@ -215,6 +240,16 @@ footer{max-width:860px; margin:0 auto; padding:10px 20px 34px; font-size:12.5px;
       <div id="quiz-score"></div>
       <div id="quiz-body"></div>
     </div>
+  </section>
+
+  <!-- 模拟考试 -->
+  <section id="page-exam" class="page hidden">
+    <div id="exam-bar" class="exam-bar">
+      <span id="exam-timer" class="exam-timer">30:00</span>
+      <span id="exam-answered" class="exam-answered">已答 0 / 20</span>
+      <button class="btn" id="btn-handin">交卷</button>
+    </div>
+    <div id="exam-body"></div>
   </section>
 
   <!-- 错题本 -->
