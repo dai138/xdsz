@@ -1,7 +1,8 @@
 /* ============================================================
  * 线性代数 智能刷题系统
  * 功能：按部分/顺序/随机练习、错题记忆与强化、知识点加权、
- *       逐选项解析、大题自评、统计与进度导出
+ *       逐选项解析、大题自评、模拟考试（随机20题·限时30分钟）、
+ *       统计与进度导出
  * 数据保存在浏览器 localStorage（建议使用 Chrome 打开）
  * ============================================================ */
 'use strict';
@@ -15,12 +16,13 @@ const CHAPTERS = [
 ];
 
 function defaultState() {
-  return { q: {}, e: {}, t: {}, settings: { mode: 'adaptive', chapter: 0, count: 10 } };
+  return { q: {}, e: {}, t: {}, examHist: [], settings: { mode: 'adaptive', chapter: 0, count: 10 } };
 }
 let state;
 try {
   state = JSON.parse(localStorage.getItem(LS_KEY)) || defaultState();
   state.q = state.q || {}; state.e = state.e || {}; state.t = state.t || {};
+  state.examHist = state.examHist || [];
 } catch (e) { state = defaultState(); }
 function save() { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 
@@ -46,6 +48,11 @@ const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const fmt = s => esc(s).replace(/\n/g, '<br>');
+function fmtTime(s) {
+  s = Math.max(0, Math.floor(s));
+  const m = Math.floor(s / 60), ss = s % 60;
+  return (m < 10 ? '0' + m : m) + ':' + (ss < 10 ? '0' + ss : ss);
+}
 
 function chapterOptions(selEl, chosen) {
   selEl.innerHTML = '';
@@ -76,6 +83,10 @@ function topicAcc(key) {
 
 // ---------------- 页面切换 ----------------
 function show(page) {
+  if (exam.running && page !== 'exam') {
+    if (!confirm('模拟考试正在进行中，离开将终止本次考试（不计成绩），确定离开？')) return;
+    exam.abort();
+  }
   $$('.page').forEach(p => p.classList.add('hidden'));
   $('#page-' + page).classList.remove('hidden');
   $$('nav button').forEach(b => b.classList.toggle('active', b.dataset.page === page));
@@ -90,7 +101,7 @@ function renderHome() {
   const done = Object.values(state.q).filter(s => (s.r || s.w)).length;
   const wCnt = Object.values(state.q).filter(s => s.w > 0).length;
   $('#home-summary').innerHTML =
-    `客观题共 <b>${total}</b> 题 · 已作答 <b>${done}</b> 题 · 错题本 <b>${wCnt}</b> 题 · 大题 <b>${ESSAYS.length}</b> 项`;
+    `客观题共 <b>${total}</b> 题 · 已作答 <b>${done}</b> 题 · 错题本 <b>${wCnt}</b> 题 · 大题 <b>${ESSAYS.length}</b> 项 · 模拟考试 <b>${state.examHist.length}</b> 次`;
 }
 function startQuiz(mode) {
   const ch = mode === 'chapter' ? parseInt($('#chapter-select').value, 10) : 0;
@@ -101,6 +112,9 @@ function startQuiz(mode) {
 function startEssay() {
   essay.init();
   show('quiz');
+}
+function startExam() {
+  exam.init();
 }
 
 // ---------------- 客观题练习 ----------------
@@ -372,6 +386,164 @@ const essay = {
   }
 };
 
+// ---------------- 模拟考试 ----------------
+const exam = {
+  DURATION: 30 * 60,   // 限时（秒）
+  TOTAL: 20,           // 题量
+  running: false, submitted: false,
+  items: [], picks: [], startTime: 0, endTime: 0, timerId: null, lastResult: null, bound: false,
+
+  init() {
+    // 随机抽 20 题（Fisher-Yates 洗牌）
+    const pool = BANK.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    this.items = pool.slice(0, Math.min(this.TOTAL, pool.length));
+    this.picks = this.items.map(() => null);
+    this.running = true; this.submitted = false; this.lastResult = null;
+    this.startTime = Date.now();
+    this.endTime = this.startTime + this.DURATION * 1000;
+    clearInterval(this.timerId);
+    this.timerId = setInterval(() => this.tick(), 1000);
+    show('exam');
+    this.render();
+    if (!this.bound) {
+      this.bound = true;
+      $('#btn-handin').addEventListener('click', () => this.handin());
+    }
+    this.tick();
+  },
+
+  tick() {
+    if (!this.running) return;
+    const remain = Math.max(0, Math.ceil((this.endTime - Date.now()) / 1000));
+    $('#exam-timer').textContent = fmtTime(remain);
+    $('#exam-timer').classList.toggle('urgent', remain <= 300 && remain > 0);
+    document.title = '⏱ ' + fmtTime(remain) + ' · 线性代数模拟考试';
+    if (remain === 0) this.submit(true);   // 时间到 → 自动交卷
+  },
+
+  render() {
+    $('#exam-bar').classList.remove('hidden');
+    $('#exam-answered').textContent = `已答 ${this.picks.filter(p => p !== null).length} / ${this.items.length}`;
+    let html = '';
+    this.items.forEach((q, i) => {
+      html += `<div class="exam-q">
+        <div class="exam-q-head"><span class="exam-q-num">第 ${i + 1} 题</span><span class="chip">${CHAPTERS[q.ch - 1]}</span><span class="chip chip-topic">${esc(q.topic)}</span></div>
+        <div class="exam-stem">${fmt(q.stem)}</div>
+        ${q.img ? `<div class="q-img"><img src="${q.img}" alt="题目示意图" onerror="this.parentElement.style.display='none'"></div>` : ''}
+        <div class="options">`;
+      q.options.forEach((op, j) => {
+        html += `<button class="option exam-opt${this.picks[i] === j ? ' selected' : ''}" data-q="${i}" data-i="${j}"><span class="opt-tag">${'ABCDEFGH'[j]}</span><span>${esc(op)}</span></button>`;
+      });
+      html += `</div></div>`;
+    });
+    $('#exam-body').innerHTML = html;
+    $$('.exam-opt').forEach(b => b.addEventListener('click', () =>
+      this.pick(parseInt(b.dataset.q, 10), parseInt(b.dataset.i, 10))));
+  },
+
+  pick(qIdx, i) {
+    if (!this.running) return;
+    this.picks[qIdx] = i;
+    $('#exam-answered').textContent = `已答 ${this.picks.filter(p => p !== null).length} / ${this.items.length}`;
+    $$('.exam-opt').forEach(b => {
+      if (parseInt(b.dataset.q, 10) === qIdx) b.classList.toggle('selected', parseInt(b.dataset.i, 10) === i);
+    });
+  },
+
+  handin() {
+    const n = this.picks.filter(p => p === null).length;
+    if (n && !confirm(`还有 ${n} 题未作答，确定交卷吗？`)) return;
+    this.submit(false);
+  },
+
+  submit(auto) {
+    if (this.submitted || !this.running) return;
+    clearInterval(this.timerId);
+    this.running = false; this.submitted = true;
+    let right = 0, wrong = 0, blank = 0;
+    this.items.forEach((q, i) => {
+      const picked = this.picks[i];
+      if (picked === null) { blank++; this.record(q, false); }
+      else if (picked === q.answer) { right++; this.record(q, true); }
+      else { wrong++; this.record(q, false); }
+    });
+    const score = Math.round(100 * right / this.items.length);
+    const used = Math.min(this.DURATION, Math.max(0, Math.round((Date.now() - this.startTime) / 1000)));
+    state.examHist.push({ ts: Date.now(), score, right, wrong, blank, total: this.items.length, used });
+    if (state.examHist.length > 30) state.examHist = state.examHist.slice(-30);
+    save();
+    document.title = '线性代数 · 智能刷题系统';
+    this.lastResult = { score, right, wrong, blank, total: this.items.length, used, auto: !!auto };
+    this.resultView(this.lastResult);
+  },
+
+  record(q, ok) {
+    const s = state.q[q.id] = state.q[q.id] || { r: 0, w: 0, seen: true };
+    const t = state.t[topicKey(q)] = state.t[topicKey(q)] || { r: 0, w: 0 };
+    s.seen = true; s.last = ok ? 'r' : 'w';
+    if (ok) { s.r++; t.r++; } else { s.w++; t.w++; }
+  },
+
+  resultView(r) {
+    const cls = r.score >= 85 ? 'good' : r.score >= 60 ? 'mid' : 'bad';
+    const emoji = r.score >= 85 ? '🏆' : r.score >= 60 ? '✅' : '📚';
+    let html = `<div class="finish-box">
+      <div class="finish-emoji">${emoji}</div>
+      <div class="exam-score ${cls}">${r.score}<span class="exam-score-unit">分</span></div>
+      <div class="finish-line">共 <b>${r.total}</b> 题 · 答对 <b>${r.right}</b>${r.wrong ? ` · 答错 <b>${r.wrong}</b>` : ''}${r.blank ? ` · 未答 <b>${r.blank}</b>` : ''} · 用时 <b>${fmtTime(r.used)}</b>${r.auto ? '（时间到，自动交卷）' : ''}</div>
+      ${r.wrong + r.blank
+        ? `<div class="finish-tip">💡 答错与未答共 <b>${r.wrong + r.blank}</b> 题，已自动记入错题本，之后练习会优先出现并连带强化对应知识点。</div>`
+        : `<div class="finish-tip">🎉 全部答对，继续保持！</div>`}
+      <div class="finish-btns">
+        <button class="btn btn-primary" onclick="exam.init()">再考一次</button>
+        <button class="btn" onclick="show('wrong')">查看错题本</button>
+        <button class="btn" onclick="show('home')">返回首页</button>
+      </div>
+    </div>
+    <h3>📋 逐题复盘</h3>`;
+    this.items.forEach((q, i) => {
+      const picked = this.picks[i];
+      const okk = picked === q.answer;
+      const verdict = picked === null
+        ? `<span class="chip chip-miss">未作答</span>`
+        : okk ? `<span class="chip chip-ok">✓ 答对</span>` : `<span class="chip chip-no">✗ 答错</span>`;
+      html += `<div class="exam-q"><div class="exam-q-head"><span class="exam-q-num">第 ${i + 1} 题</span><span class="chip">${CHAPTERS[q.ch - 1]}</span><span class="chip chip-topic">${esc(q.topic)}</span>${verdict}</div>`;
+      html += `<div class="exam-stem">${fmt(q.stem)}</div><div class="fb-options">`;
+      q.options.forEach((op, j) => {
+        const isAns = q.answer === j, isPk = picked === j;
+        html += `<div class="fb-opt ${isAns ? 'opt-right' : isPk ? 'opt-wrong' : ''}"><span class="opt-tag">${'ABCDEFGH'[j]}${isAns ? '✓' : isPk ? '✗' : ''}</span>
+          <div><div class="fb-opt-text">${esc(op)}</div>
+          ${(isAns || isPk) && q.exp[j] ? `<div class="fb-opt-exp">${esc(q.exp[j])}</div>` : ''}</div></div>`;
+      });
+      html += `</div>`;
+      const rest = q.exp.filter((_, j) => q.answer !== j && picked !== j).join('　');
+      if (rest) html += `<details class="fb-rest"><summary>查看其余选项解析</summary><div class="fb-opt-exp">${esc(rest)}</div></details>`;
+      if (q.note) html += `<div class="fb-note">📌 ${esc(q.note)}</div>`;
+      html += `</div>`;
+    });
+    $('#exam-body').innerHTML = html;
+    $('#exam-bar').classList.add('hidden');
+  },
+
+  abort() {
+    if (!this.running) return;
+    clearInterval(this.timerId);
+    this.running = false; this.submitted = true;
+    document.title = '线性代数 · 智能刷题系统';
+  }
+};
+
+// 考试进行中刷新/关闭页面时提醒
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('beforeunload', e => {
+    if (exam.running) { e.preventDefault(); e.returnValue = ''; }
+  });
+}
+
 // ---------------- 错题本 ----------------
 function renderWrong() {
   const wrongQ = BANK.filter(q => (state.q[q.id] || {}).w > 0)
@@ -456,6 +628,20 @@ function renderStats() {
         <span class="stat-label">${CHAPTERS[parseInt(ch, 10) - 1].replace(/^第\d+章 /, '')} · ${esc(topic)}</span>
         <span class="stat-bar-wrap"><span class="stat-bar bar-red" style="width:${pct}%"></span></span>
         <span class="stat-val">错 ${v.w} / 共 ${v.r + v.w}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (state.examHist.length) {
+    html += `<h3>模拟考试记录（最近 ${Math.min(10, state.examHist.length)} 次）</h3><div class="stat-list">`;
+    state.examHist.slice().reverse().slice(0, 10).forEach(h => {
+      const d = new Date(h.ts);
+      const pad = n => String(n).padStart(2, '0');
+      html += `<div class="stat-row">
+        <span class="stat-label">${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())} · 用时 ${fmtTime(h.used)}</span>
+        <span class="stat-bar-wrap"><span class="stat-bar ${h.score < 60 ? 'bar-red' : h.score < 85 ? 'bar-yellow' : 'bar-green'}" style="width:${h.score}%"></span></span>
+        <span class="stat-val">${h.score} 分（${h.right}/${h.total}）</span>
       </div>`;
     });
     html += `</div>`;
