@@ -13,6 +13,7 @@ const CHAPTERS = [
   '第二部分 逆矩阵与初等变换',
   '第三部分 分块矩阵与线性方程组',
   '第四部分 向量乘法与综合应用',
+  '第五部分 相似矩阵与二次型',
 ];
 
 function defaultState() {
@@ -394,8 +395,8 @@ const exam = {
   items: [], picks: [], startTime: 0, endTime: 0, timerId: null, lastResult: null, bound: false,
 
   init() {
-    // 随机抽 20 题（Fisher-Yates 洗牌）
-    const pool = BANK.slice();
+    // 从单选题中随机抽 20 题（Fisher-Yates 洗牌；填空题不便限时作答，不进入考试）
+    const pool = BANK.filter(q => q.type === 'single');
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
